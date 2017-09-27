@@ -196,5 +196,4 @@ def main():
     print('Idle Signal Received')
 
 if __name__ == '__main__':
-    ...
     main()
