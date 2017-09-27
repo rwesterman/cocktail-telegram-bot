@@ -6,7 +6,7 @@ from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
 
 import searchSS
-from cocktails import dropbox_init
+#from cocktails import dropbox_init
 
 CHOOSE, LOOP = range(2)
 conv_keyboard = [['/Return', '/Exit']]
@@ -64,14 +64,14 @@ def listRandom(bot, update, args):
     df, sh = searchSS.sheetsInit()  #Reinitialize the dataframe to avoid failures
 
     randRecipes = searchSS.get_random(df, number)
-    #bot.send_message(chat_id = update.message.chat_id, text = 'This is a heartbeat')
+    
 
     for recipe in randRecipes:
         botString = searchSS.recipe_string(recipe, 0)           #Fix this number
         bot.send_message(chat_id=update.message.chat_id, text=botString)
 
-def dbxInit(bot, update):
-    dropbox_init()
+#def dbxInit(bot, update):
+#    dropbox_init()
 
 
 
@@ -170,8 +170,8 @@ def main():
     random_handler = CommandHandler('random', listRandom, pass_args= True)
     dispatcher.add_handler(random_handler)
 
-    dbx_handler = CommandHandler('dbxinit', dbxInit)
-    dispatcher.add_handler(dbx_handler)
+    #dbx_handler = CommandHandler('dbxinit', dbxInit)
+    #dispatcher.add_handler(dbx_handler)
 
     conv_handler = ConversationHandler(
         entry_points= [CommandHandler('list', listDrinks)],
