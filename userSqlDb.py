@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
 import logging
 
-engine = create_engine('sqlite:///bottender_test.db')
+engine = create_engine('sqlite:///user.db')
 Base = declarative_base()
 # Bind the new Session to our engine
 Session = sessionmaker(bind=engine)
