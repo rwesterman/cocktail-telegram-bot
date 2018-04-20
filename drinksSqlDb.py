@@ -42,7 +42,7 @@ class Garnish(Base):
 Session = sessionmaker(bind=engine, autoflush= False)
 Base.metadata.create_all(engine)
 
-def drink_name_contains(name, session):
+def query_drink_contains(name, session):
     session = Session()
     return session.query(Drink).filter(Drink.drink_name.contains(name)).all(), session
 
@@ -134,8 +134,8 @@ if __name__ == '__main__':
         print(lemon.drinks)
     close_session(session)
 
-    # drink_list = drink_name_contains("fashion")
-    # logging.debug("drink_list object returned from drink_name_contains(): {}".format(drink_list))
+    # drink_list = query_drink_contains("fashion")
+    # logging.debug("drink_list object returned from query_drink_contains(): {}".format(drink_list))
     # for drink in drink_list:
     #     print(drink.drink_name)
     #     print(get_ing_list(drink))

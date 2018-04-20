@@ -59,6 +59,12 @@ def add_user(user_id, chat_id, first_name, last_name = ""):
     #     session.close()
 
 def set_user_favorite(user, fav_drink, session):
+    """
+    :param user: User object, should already exist in database
+    :param fav_drink: String, to be taken from Drink object in drinksSqlDb
+    :param session: Session object
+    :return:
+    """
     """Adds drink to favorites table if not already in, then adds it to User's favorites list"""
     in_table = check_drink_in_table(fav_drink)
     # If the drink isn't in the table, add it (it will be an empty list if not in table)
@@ -91,11 +97,12 @@ def check_drink_in_table(drink_name):
     session.close()
     return favs
 
-def check_for_user_id(id):
+def check_for_user_id(id, session = ""):
     """Check if a user_id exists in the database already"""
-    # create an instance of Session class
-    session = Session()
-    user =  session.query(User).filter(User.user_id == id).first()
+    # If no session is provided, create an instance of Session class
+    if not session:
+        session = Session()
+    user = session.query(User).filter(User.user_id == id).first()
     # session.close()
     return user, session
 

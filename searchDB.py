@@ -1,5 +1,5 @@
 import logging
-from drinksSqlDb import drink_name_contains, get_ing_list, get_session, close_session, query_ing_contains
+from drinksSqlDb import query_drink_contains, get_ing_list, get_session, close_session, query_ing_contains
 
 def drink_search(drink_list):
     """Returns Drink objects corresponding to searched drink names"""
@@ -19,7 +19,7 @@ def drink_search(drink_list):
     for index in range(num_drinks):
         # Get a list of drink names that contain the searched term for each index
         # session remains consistent throughout this loop
-        recipe, session = drink_name_contains(drink_list[index], session)
+        recipe, session = query_drink_contains(drink_list[index], session)
         # list.extend concatenates the list so it's one dimensional
         result_list.extend(recipe)
 
