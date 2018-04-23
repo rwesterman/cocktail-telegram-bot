@@ -87,7 +87,7 @@ def add_fav_drink(bot,update):
     :return:
     """
     logging.debug("Reached add_fav_drink")
-    drnk_session = drinksSqlDb.get_session()
+    drnk_session = drinksSqlDb.get_drink_session()
     # If drink is exact match, adds drink and prompts to add another
     check_text = update.message.text
     chat_user = update.message.from_user
@@ -127,10 +127,24 @@ def rem_fav_command(bot,update):
                      text="You have chosen to remove a drink to your favorites list.")
     return REMOVE
 
+def user_not_added(bot, update):
+    bot.send_message(chat_id = update.message.chat_id,
+                     text = "You have not been added to the user database, so this command is currently unavailable."
+                            "\nIf you want to use this function, please send the '/start' command and allow "
+                            "tracking your user info.")
+
 def favorite_recipes(bot,update):
     # Todo: Send a list of recipes for each drink in the favorites list
     chat_user = update.message.from_user
-    user, session = userSqlDb.check_for_user_id(chat_user.id)
+    try:
+        user, session = userSqlDb.check_for_user_id(chat_user.id)
+    except TypeError as e:
+        # Will receive TypeError if the check_for_user_id fails to return a user, NoneType not iterable
+        logging.warning("User is not in the user database, needs to be added to use this functionality")
+        user_not_added(bot, update)
+        # Todo: Figure out how to handle this exception
+        # Raise the same TypeError that was caught here
+        raise
     user_favs = userSqlDb.get_user_favorites(user)
     # If user has not added any favorite drinks, return "No favorites found"
     if not user_favs:
@@ -145,8 +159,60 @@ def favorite_recipes(bot,update):
         bot.send_message(chat_id = update.message.chat_id, text = bot_text)
     return ConversationHandler.END
 
+def makeable_from_inv(bot, update):
+    # Create an empty set that will hold all drink possibilities
+    try:
+        user, session = userSqlDb.check_for_user_id(update.message.from_user.id)
+    except TypeError as e:
+        # Will receive TypeError if the check_for_user_id fails to return a user, NoneType not iterable
+        logging.warning("User is not in the user database, needs to be added to use this functionality")
+        user_not_added(bot, update)
+        # Todo: Figure out how to handle this exception
+        # Raise the same TypeError that was caught here
+        raise
 
-# This is passed a list of strings in variable args
+
+def compare_vs_inventory(drink_set, user_inventory):
+    """
+
+    :param drink_set: a Set that contains names of drinks (not set of drink objects)
+    :param user_inventory: a Set that contains all Inventory object from given user
+    :return:
+    """
+    # Todo: Subset approach won't work because inventory list is not exactly. Can change the inventory system or find a way to filter the drink ingredients down to simple terms, then do a "contains" compare???
+    # Holds drinks that can be made
+    final_drink_set = set()
+
+    for current_drink in drink_set:
+        drink, session = drinksSqlDb.query_drink_first(current_drink)
+        test_drink_ing = set(drink.ingredients)
+        logging.debug("Testing that drink ingredients set works properly: \n{}".format(test_drink_ing))
+
+        if test_drink_ing.issubset(user_inventory):
+            final_drink_set.add(drink)
+        # Get drink object from table. Then check if all the ingredients appear in the user's inventory
+        #
+        # Want to do a subset operation here. If ingredients in drink are a subset of user_inventory
+    return final_drink_set
+
+
+def test_makeable(user):
+    drink_set = set()
+    user_inventory = set()
+
+    # get list of what user has in stock
+    user_inventory = set(user.stock)
+
+    # for each ingredient in inventory list, check what drinks can be
+    for ing in user_inventory:
+        # call ing_search() to get every drink the ingredient shows up in
+        # call set.union() on this to add distinct values
+        drink_set.update(searchDB.ing_search(ing.stock))
+
+    final_drink_set = compare_vs_inventory(drink_set, user_inventory)
+
+    print(drink_set)
+
 # use this to call drink_search with the arguments that are passed
 def drinks(bot, update, args):
     #If user sent drink names, return drinks. Else, set drink_search to True
@@ -170,7 +236,8 @@ def recipe_return(bot, update, args=""):
 
 def find_recipes(bot, update, drinks_list):
     recipes, session = searchDB.drink_search(drinks_list)
-    if recipes == []:
+    # If recipes is empty list, then send "No Recipes Found" message
+    if not recipes:
         bot.send_message(chat_id=update.message.chat_id, text='Sorry, no recipes found for that name')
     else:
         for recipe in recipes:
@@ -256,14 +323,14 @@ def create_handlers(updater, dispatcher):
 
 
 def main():
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     # Bottender Token
-    token = '391638807:AAGqCR37_1y9uxMTZfAlnKromKhS0J0XsZc'
+    # token = '391638807:AAGqCR37_1y9uxMTZfAlnKromKhS0J0XsZc'
 
     # Debugbot Token
-    # token = '563248703:AAGiRYnpZ_vFuG_ycowZ4qRH7vt63Wc3j58'
+    token = '563248703:AAGiRYnpZ_vFuG_ycowZ4qRH7vt63Wc3j58'
     global updater
     updater = Updater(token=token)  # pass bot api token
     dispatcher = updater.dispatcher
@@ -275,4 +342,21 @@ def main():
     print('Idle Signal Received')
 
 if __name__ == '__main__':
-    main()
+    # main()
+    logging.basicConfig(level = logging.DEBUG)
+    jack, session = userSqlDb.add_user(user_id = 22, first_name = "jack", chat_id = 22)
+    inv_to_add = ["Rittenhouse", "Buffalo Trace", "Bourbon", "Demerara", "Bitter Truth"]
+
+    for ing in inv_to_add:
+        userSqlDb.add_inventory(jack, session, ing)
+
+    test_makeable(jack)
+    # logging.basicConfig(level = logging.DEBUG)
+    # session = drinksSqlDb.get_drink_session()
+    # session.rollback()
+    # # session = drinksSqlDb.get_drink_session()
+    # ingredients = session.query(drinksSqlDb.Ingredient)
+    # for ingred in ingredients:
+    #     q, m, i = userSqlDb.ing_regex(ingred)
+    #     new_ing, session = drinksSqlDb.add_ing_no_quant(q, m, i, session)
+    # session.close()

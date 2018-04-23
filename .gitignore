@@ -6,3 +6,7 @@
 
 # Ignore created databases
 *.db
+*.bak
+*.pyc
+*.xml
+.idea/cocktail-telegram-bot.iml

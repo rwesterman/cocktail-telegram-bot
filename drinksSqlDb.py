@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Integer, Table, ForeignKey
+from sqlalchemy import create_engine, Column, String, Integer, Table, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
@@ -8,9 +8,13 @@ import logging
 engine = create_engine('sqlite:///drinks.db')
 Base = declarative_base()
 
-association_table = Table('association', Base.metadata,
-                Column('Drink_name', String, ForeignKey('drinks.drink_name')),
-                Column('Ingredients_string', String, ForeignKey('ingredients.ing')))
+ing_assc_table = Table('ing_assc', Base.metadata,
+                       Column('Drink_name', String, ForeignKey('drinks.drink_name')),
+                       Column('Ingredients_string', String, ForeignKey('ingredients.ing')))
+
+gar_assc_table = Table('gar_assc', Base.metadata,
+                       Column('Drink_name', String, ForeignKey('drinks.drink_name')),
+                       Column('Garnish_string', String, ForeignKey('garnishes.gar')))
 
 class Drink(Base):
     __tablename__ = 'drinks'
@@ -18,7 +22,8 @@ class Drink(Base):
     drink_name = Column(String, primary_key=True)
     page = Column(String)
 
-    ingredients = relationship("Ingredient", secondary = association_table)
+    ingredients = relationship("Ingredient", secondary = ing_assc_table)
+    garnishes = relationship("Garnish", secondary = gar_assc_table)
 
     def __repr__(self):
         return "<Drink(drink_name = {}, page = {})>".format(self.drink_name, self.page)
@@ -29,31 +34,68 @@ class Ingredient(Base):
     ing = Column(String, primary_key= True)
     popularity = Column(Integer)
 
-    drinks = relationship("Drink", secondary = association_table)
+    drinks = relationship("Drink", secondary = ing_assc_table)
     def __repr__(self):
         return "<Ingredient(ing = {}, popularity = {})>".format(self.ing, self.popularity)
 
 class Garnish(Base):
     __tablename__ = 'garnishes'
-
     # holds garnishes for each drink. This may or may not work with relationships
     gar = Column(String, primary_key=True)
+
+    def __repr__(self):
+        return "<Garnish(gar = {})>".format(self.gar)
+
+class Ing_No_Quantity(Base):
+    """
+    This class is used as a list of ingredients with no quantities ascribed to them.
+    It will primarily be used as a reference when adding ingredients to inventory
+    """
+    __tablename__ = 'ing_no_q'
+
+    ing_id = Column(Integer, primary_key= True)
+    ing = Column(String)
+    quantity = Column(Float)
+    measurement = Column(String)
+
+    def __repr__(self):
+        return "<Ing_No_Quantity(ing = {}, quantity = {}, measurement = {})>".format(
+            self.ing, self.quantity, self.measurement)
+
 
 Session = sessionmaker(bind=engine, autoflush= False)
 Base.metadata.create_all(engine)
 
-def query_drink_contains(name, session):
-    session = Session()
+# Todo: Look into adding conditional for creating new Session() object
+def query_drink_contains(name, session= ""):
+    if not session:
+        session = Session()
     return session.query(Drink).filter(Drink.drink_name.contains(name)).all(), session
 
-def query_drink_all(name, session):
-
-    session = Session()
+def query_drink_all(name, session = ""):
+    if not session:
+        session = Session()
     return session.query(Drink).filter(Drink.drink_name.like(name)).all(), session
 
-def query_drink_first(name, session):
-    session = Session()
+def query_drink_first(name, session = ""):
+    if not session:
+        session = Session()
     return session.query(Drink).filter(Drink.drink_name.like(name)).first(), session
+
+def add_ing_no_quant(quantity, measurement, ingredient, session = ""):
+    if not session:
+        session = Session()
+    new_ing = Ing_No_Quantity(quantity = quantity, measurement = measurement, ing = ingredient)
+    session.add(new_ing)
+    logging.info("Adding new Ing_No_Quantity {}".format(new_ing))
+    try:
+        session.commit()
+        return new_ing, session
+    except:
+        session.rollback()
+        logging.error("Trying to add duplicate values to Ing_No_Quantity")
+        return "", session
+
 
 def add_drink(name, page):
     """Try to add a new drink to the Drink database, return Drink object and session"""
@@ -111,6 +153,17 @@ def check_ing_in_table(ing_name, session):
     ingred.popularity = ingred.popularity + 1
     return ingred
 
+def check_garnish_in_table(garnish, session):
+    in_table = session.query(Garnish).filter(Garnish.gar == garnish).first()
+
+    if not in_table:
+        logging.debug("Adding garnish {} to table".format(garnish))
+        gar = Garnish(gar = garnish)
+    else:
+        logging.debug("Garnish already in table")
+        gar = in_table
+    return gar[0]
+
 def get_ing_list(drink):
     """Takes a Drink object and returns a list of ingredients"""
     ings = []
@@ -118,7 +171,7 @@ def get_ing_list(drink):
         ings.append(ingredient.ing)
     return ings
 
-def get_session():
+def get_drink_session():
     session = Session()
     return session
 
@@ -128,11 +181,13 @@ def close_session(session):
 
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
-    session = get_session()
-    lemoning = query_ing_contains("benedictine", session)
-    for lemon in lemoning:
-        print(lemon.drinks)
-    close_session(session)
+
+
+    # session = get_drink_session()
+    # lemoning = query_ing_contains("benedictine", session)
+    # for lemon in lemoning:
+    #     print(lemon.drinks)
+    # close_session(session)
 
     # drink_list = query_drink_contains("fashion")
     # logging.debug("drink_list object returned from query_drink_contains(): {}".format(drink_list))
