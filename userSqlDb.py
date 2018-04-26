@@ -1,10 +1,9 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.exc import IntegrityError, InvalidRequestError
 import logging
 
-import re
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table
+from sqlalchemy.exc import IntegrityError, InvalidRequestError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
 
 engine = create_engine('sqlite:///user.db')
 Base = declarative_base()
@@ -22,7 +21,6 @@ inv_assc_table = Table('inv_assc', Base.metadata,
 class User(Base):
     __tablename__ = 'users'
 
-    # id = Column(Integer, primary_key=True)
     user_id = Column(Integer, primary_key=True)
     first_name = Column(String)
     last_name = Column(String)
@@ -39,9 +37,7 @@ class User(Base):
 
 class Favorite(Base):
     __tablename__ = 'favorites'
-    # id = Column(Integer, nullable= False)
     favorites = Column(String, primary_key= True)
-    # user_id = Column(Integer, ForeignKey('users.user_id'))
     popularity = Column(Integer)
 
     def __repr__(self):
@@ -54,12 +50,12 @@ class Inventory(Base):
     __tablename__ = 'inv'
 
     stock = Column(String, primary_key= True)
-    # Amount will list number of bottles available, (Defaults to 1 when added to user)
-    # amount = Column(Integer)
+    usr_inv = relationship("User", secondary = inv_assc_table)
 
     def __repr__(self):
         return "<Inventory(stock = {})>".format(self.stock)
 Base.metadata.create_all(engine)
+
 
 def add_user(user_id, chat_id, first_name, last_name = ""):
 
@@ -68,7 +64,8 @@ def add_user(user_id, chat_id, first_name, last_name = ""):
     session = Session()
     # Add our User object to our Session
     session.add(new_user)
-        # Commit the changes to the database
+
+    # Commit the changes to the database
     try:
         session.commit()
         return new_user, session
@@ -78,84 +75,6 @@ def add_user(user_id, chat_id, first_name, last_name = ""):
         print("Trying to add a non-unique row to database, returning existing user")
         return existing_user, session
 
-def ing_regex(ingredient):
-    """
-    Uses regex to separate quantity from ingredients
-    :param ingredient: Ingredient object, to be stripped to ingredient name value
-    :return: Returns three variables: quantity (float), measurement (String), ing (String)
-    """
-    ing_name = ingredient.ing
-    # logging.info("Starting ingredient name: {}".format(ing_name))
-    # Initialize holder variables
-    quantity, dash_hold, tsp_hold, special_flag, oz_hold = "", "", "", "", ""
-
-    # Num pattern looks for numbers and periods at start of string, plus a space after
-    num_pattern = r"^[1-9.]+ "
-    match_num = re.match(num_pattern, ing_name)
-
-    # If ing_name has a number at start of string, proceed
-    if match_num:
-        # float value for quantity specified
-        quantity = float(match_num.group().strip())
-        # Remove this number substring from ing_name
-        ing_name = re.sub(num_pattern, "", ing_name)
-
-    # Move on to checking for corner case values (TSP, DASHES, etc.)
-    # These can be done simultaneously because they are mutually exclusive
-    dash_pattern = r"^DASH[E]*[S]* "
-    tsp_pattern = r"^TSP[S]* "
-    match_dash = re.match(dash_pattern, ing_name,flags = re.IGNORECASE)
-    match_tsp = re.match(tsp_pattern, ing_name, flags = re.IGNORECASE)
-    if match_dash:
-        dash_hold = match_dash.group().strip()
-        ing_name = re.sub(dash_pattern, "", ing_name)
-    elif match_tsp:
-        tsp_hold = match_tsp.group().strip()
-        ing_name = re.sub(tsp_pattern, "", ing_name)
-    # For special cases, there will be no measurement given (Egg, Mint, etc)
-    elif re.match(r"(MINT )+(EGG )+(FUJI )+(RIPE )+", ing_name, flags = re.IGNORECASE):
-        # special_flag acts to show that the measurement should stay blank
-        special_flag = True
-    else:
-        oz_hold = 'oz.'
-
-    #First value
-    # If no number matched, set quantity to zero (arbitrary number), else return quantity
-    if not quantity:
-        quantity = 0
-
-    #Second value
-    # OR the _hold vars, if all are None, then special_flag is true, and measurement = ""
-    measurement = dash_hold or tsp_hold or oz_hold
-    if not measurement:
-        # This is the special case with no measurement given
-        measurement = ""
-
-    # logging.debug("Ending ingredient name: {}".format(ing_name))
-    logging.debug("Converted Ingredient: {} {} {}".format(quantity, measurement, ing_name))
-    return quantity, measurement, ing_name
-
-
-def copy_ing_to_inv(ingredients):
-    """
-    Strip ingredients to grab their name, then put it in Inventory.stock
-    :param ingredients: all Ingredient objects from table ingredients
-    :return:
-    """
-    # Go through list of Ingredient objects and extract Ingredient.ing
-    session = Session()
-    # session = Session()
-    for ingredient in ingredients:
-        try:
-            new_inv = Inventory(stock = ingredient.ing)
-            logging.debug("New Inventory Item: {}".format(new_inv))
-            session.add(new_inv)
-            session.commit()
-        except IntegrityError as e:
-            logging.error("Error in copy_ing_to_inv: {}".format(e))
-    logging.debug("Copied all ingredients to Inventory table")
-
-    session.close()
 
 def set_user_favorite(user, fav_drink, session):
     """
@@ -188,13 +107,32 @@ def set_user_favorite(user, fav_drink, session):
         session.rollback()
         logging.error("Encountered IntegrityError in set_user_favorite(). Rolling session back")
 
+def rem_user_favorites(user, session, drink_name):
+    rem_drink = session.query(Favorite).filter(Favorite.favorites.like(drink_name)).first()
+
+    try:
+        user.favorites.remove(rem_drink)
+        session.commit()
+        logging.info("Removed {} from {}'s favorites".format(drink_name.title(), user.first_name))
+    except ValueError as e:
+        logging.warning("Trying to remove a value that doesn't exist")
+        raise
+    except IntegrityError as e:
+        session.rollback()
+        logging.warning("Failed to commit changes in rem_inventory(), rolling back session")
+
 def get_user_favorites(user):
+    """
+    Returns a list of Favorite objects associated with given User
+    :param user: User object
+    :return: List of Favorite objects
+    """
     return user.favorites
 
 def check_drink_in_table(drink_name):
     """Checks to see if a drink is already in the favorites table, and returns it if so"""
     session = Session()
-    favs =  session.query(Favorite).filter(Favorite.favorites == drink_name).first()
+    favs = session.query(Favorite).filter(Favorite.favorites.like(drink_name)).first()
     session.close()
     return favs
 
@@ -211,22 +149,28 @@ def check_ing_in_inv(ing_name):
     """Checks for ingredient name in inventory table"""
     session = Session()
     ing_exists = session.query(Inventory).filter(Inventory.stock.like(ing_name)).first()
-    session.close()
     return ing_exists
 
-def add_inventory(user, session, ing_name):
-    # Todo: Incorporate checking against Ing_No_Quantity names to confirm that it's a real ingredient
+
+def add_inventory(user, ing_name, session):
     # Todo: Consolidate this method with set_user_favorite
     """
-    Adds an ingredient to the 'inventory' table of user.db, then adds to the user's stock
-    :param user: a User object
+    Adds item to inventory table, then adds inventory item to user's inventory
     :param session:
+    :param user: a User object
     :return:
     """
+    usr_sess = session
     in_table = check_ing_in_inv(ing_name)
     if not in_table:
         logging.debug("Adding {} to inventory table".format(ing_name))
         inv = Inventory(stock = ing_name) # Add the ingredient to the inventory table
+        usr_sess.add(inv)
+        try:
+            usr_sess.commit()
+        except IntegrityError as e:
+            logging.debug("Session commit failed in add_inventory, rolling back")
+            usr_sess.rollback()
     #If the ingredient is in the table, simply add it to user
     else:
         logging.debug("Ingredient is already in inventory table")
@@ -234,13 +178,19 @@ def add_inventory(user, session, ing_name):
 
     try:
         # Add drink to user's favorites and commit changes
-        user.stock.append(inv)
-        session.commit()
+
+        # THIS IS VITAL. Inventory was on a different session for some reason,
+        # this is here to merge it to my current session
+        local_inv = usr_sess.merge(inv)
+
+        user.stock.append(local_inv)
+        usr_sess.commit()
         logging.info("Added {} to inventory of user {}".format(ing_name, user.first_name))
     except InvalidRequestError as e:
+        logging.error("InvalidRequestError {}".format(e))
         logging.error("The user already has {} in their inventory".format(ing_name))
     except IntegrityError as e:
-        session.rollback()
+        usr_sess.rollback()
         logging.error("Encountered IntegrityError in add_inventory(). Rolling session back")
 
 
@@ -259,31 +209,20 @@ def rem_inventory(user, session, ing):
         logging.info("Removed {} from inventory of user {}".format(ing, user.first_name))
     except ValueError as e:
         logging.warning("Trying to remove a value that doesn't exist")
+        raise
     except IntegrityError as e:
         session.rollback()
         logging.warning("Failed to commit changes in rem_inventory(), rolling back session")
+
+def get_user_inv(user):
+    """
+    Returns a list of Inventory objects associated with user
+    :param user: User object
+    :return: List of Inventory objects
+    """
+    return user.stock
 
 
 
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
-
-    jack, session = add_user(user_id = 22, first_name = "jack", chat_id = 22)
-    inv_to_add = ["Rittenhouse", "Buffalo Trace", "Bourbon", "Demerara", "Bitter Truth"]
-
-    for ing in inv_to_add:
-        add_inventory(jack, session, ing)
-
-
-    # add_inventory(jack, session,"Rittenhouse")
-    # add_inventory(jack, session, "Buffalo Trace")
-    # add_inventory(jack, session, "Simple syrup")
-    # add_inventory(jack, session, "Angostura")
-    # add_inventory(jack, session,)
-    # jill, session2 = add_user(user_id = 23, first_name = "jill", chat_id = 23)
-    # set_user_favorite(jack, "Old-Fashioned", session)
-    # set_user_favorite(jill, "Old-Fashioned", session2)
-    # set_user_favorite(jack, "Negroni", session)
-    # set_user_favorite(jack, "Negroni", session)
-    # print("Jack's favorites: {}".format(get_user_favorites(jack)))
-    # print("Jack's user info: {}".format(check_for_user_id(22)))

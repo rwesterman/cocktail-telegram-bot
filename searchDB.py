@@ -1,5 +1,5 @@
 import logging
-from drinksSqlDb import query_drink_contains, get_ing_list, get_drink_session, close_session, query_ing_contains
+from drinksSqlDb import query_drink_contains, get_formatted_ingredients, get_drink_session, close_session, ing_contains_all
 
 def drink_search(drink_list):
     """Returns Drink objects corresponding to searched drink names"""
@@ -32,13 +32,13 @@ def ing_search(ing_name):
     use_list = []
     session = get_drink_session()
     # lstoflst_drinks is a list of lists containing drink objects
-    lstoflst_drinks = query_ing_contains(ing_name, session)
+    lstoflst_drinks = ing_contains_all(ing_name, session)
     for lst in lstoflst_drinks:
         # lst.drinks is a list of Drink objects
         for drink in lst.drinks:
             # append each drink name to existing list
             use_list.append(drink.drink_name)
-    logging.debug("Resulting list from ing_search: {}".format(use_list))
+    logging.debug("{} results for ingredient {}: {}".format(len(use_list), ing_name, use_list))
     close_session(session)
     return use_list
 
@@ -46,14 +46,13 @@ def ing_search(ing_name):
 def recipe_string(recipe, session):
     """Takes recipe (instance of Drink), and builds string for output"""
     botString = "{} is found on page {}:\n".format(recipe.drink_name, recipe.page)
-    botString += '\n'.join(get_ing_list(recipe)).title()
+    botString += '\n'.join(get_formatted_ingredients(recipe)).title()
     # If the drink has a garnish, add it to the bottom of the string
     if recipe.garnishes:
         logging.debug("return from Drink.garnishes: {}".format(recipe.garnishes))
         botString += "\nGarnish with {}".format(recipe.garnishes[0].gar.title())
     logging.debug("botstring output: {}".format(botString))
     return botString
-
 #
 #
 # if __name__ == '__main__':

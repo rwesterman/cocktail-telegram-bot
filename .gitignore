@@ -4,8 +4,8 @@
 # Ignore googleapis
 *googleapis*
 
-# Ignore created databases
-*.db
+# Ignore user database, but upload drinks.db
+user.db
 *.bak
 *.pyc
 *.xml
