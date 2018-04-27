@@ -4,8 +4,11 @@ from sqlalchemy import create_engine, Column, String, Integer, Table, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
-import logging
+import logging.handlers
+from readJSON import Secrets, Loggers
 
+drinks_info = logging.getLogger("info." + __name__)
+drinks_warn = logging.getLogger("warn." + __name__)
 
 engine = create_engine('sqlite:///drinks.db')
 Base = declarative_base()
@@ -18,6 +21,9 @@ ing_assc_table = Table('ing_assc', Base.metadata,
 gar_assc_table = Table('gar_assc', Base.metadata,
                        Column('Drink_name', String, ForeignKey('drinks.drink_name')),
                        Column('Garnish_string', String, ForeignKey('garnishes.gar')))
+def logtest():
+    drinks_info.info("Testing the info logger")
+    drinks_warn.error("Testing the error logger")
 
 class Drink(Base):
     __tablename__ = 'drinks'
@@ -122,13 +128,13 @@ def add_ingredient(quantity, measurement, ingredient, session =""):
         session = Session()
     new_ing = Ingredient(quantity = quantity, measurement = measurement, ing = ingredient, popularity = 0)
     session.add(new_ing)
-    logging.info("Adding new Ingredient {}".format(new_ing))
+    drinks_info.info("Adding new Ingredient {}".format(new_ing))
     try:
         session.commit()
         return new_ing, session
     except:
         session.rollback()
-        logging.error("Trying to add duplicate values to Ingredient")
+        drinks_warn.error("Trying to add duplicate values to Ingredient, returning empty string")
         return "", session
 
 
@@ -160,7 +166,7 @@ class DB_Builder():
         df, sh = self.sheets_init()
         # Squash the object to just drink names and pages
         for row in df.itertuples():
-            logging.debug(row)
+            drinks_info.debug(row)
             # Columns 0 and 1 are drink names and pages respectively
             new_drink, session = add_drink(row[0], row[1])
             # Range 2 to 12 in row are ingredients, add them while they exist
@@ -182,7 +188,7 @@ class DB_Builder():
                 session.close()
             except IntegrityError as e:
                 session.rollback()
-                logging.error("Attempting to add duplicate Ingredient, rolling back session")
+                drinks_warn.warning("Attempting to add duplicate Ingredient, rolling back session")
                 session.close()
 
     def get_df(self, has_header, index_comlumn, start, end, wks):
@@ -202,16 +208,19 @@ class DB_Builder():
 
     def sheets_init(self):
         """Initializes google sheets, returns dataframe and sheet object"""
-        client_secret = 'client_secret_11971016162-198la1sa3dvcin75tnq8nhsdrepeh8nl.apps.googleusercontent.com.json'
-        sheet_name = 'Death & Co Cocktails'
+        # Get private details from secret.json file
+        auth = Secrets()
+        client_secret = auth.client_secret
+        sheet_name = auth.sheet_name
         gc = pygsheets.authorize(client_secret)
         sh, wks = self.open_sheet(sheet_name, 'AllDrinks', gc)  # Open sheet with given name, or create if not found
         last_row = 'N' + str(wks.rows)
         df = self.get_df(True, 1, 'A1', last_row, wks)  # get dataframe from AllDrinks worksheet
         return df, sh
 
-    def populate_simple_drink(self, session):
-
+    def populate_simple_drink(self, session = ""):
+        if not session:
+            session = Session()
         # Iterate through simplify_dict to find each ingredient that contains the name of the dictionary key
         for category in self.simplify_dict:
             associate_ing = session.query(Ingredient).filter(Ingredient.ing.contains(category)).all()
@@ -222,7 +231,7 @@ class DB_Builder():
                 # Add the value associated with current key in simplify_dict to simple
                 simple, session = self.add_ing_to_simple(self.simplify_dict[category], session)
                 if simple:
-                    logging.debug("Trying to append this {}".format(simple))
+                    drinks_info.debug("Trying to append this {}".format(simple))
                     ing.simple.append(simple)
 
     def add_ing_to_simple(self, ing_name, session = ""):
@@ -241,7 +250,7 @@ class DB_Builder():
             return new_simple, session
         except IntegrityError as e:
             session.rollback()
-            logging.warning("Failed add simple ingredient {}".format(ing_name))
+            drinks_warn.error("Failed add simple ingredient {}".format(ing_name))
             return "", session
 
 
@@ -256,12 +265,12 @@ def check_ing_in_table(ing_name, session, quantity, measurement):
     in_table = session.query(Ingredient).filter(Ingredient.ing == ing_name, Ingredient.quantity == quantity,
                                                 Ingredient.measurement == measurement).first()
     if not in_table:
-        logging.debug("Ingredient is not yet in table")
+        drinks_info.info("Adding Ingredient {} to database.".format(ing_name))
         ingred = Ingredient(ing = ing_name, quantity = quantity, measurement = measurement, popularity = 0) #popularity = 0 because not in anyones favorites yet
 
     #If the drink is in the table, simply add it to user
     else:
-        logging.debug("Ingredient is already in table")
+        drinks_info.debug("Ingredient is already in table")
         ingred = in_table #set to same variable as in "if" statement
 
     ingred.popularity = ingred.popularity + 1
@@ -277,10 +286,10 @@ def check_garnish_in_table(garnish, session):
     in_table = session.query(Garnish).filter(Garnish.gar == garnish).first()
 
     if not in_table:
-        logging.debug("Adding garnish {} to table".format(garnish))
+        drinks_info.info("Adding garnish {} to table".format(garnish))
         gar = Garnish(gar = garnish)
     else:
-        logging.debug("Garnish already in table")
+        drinks_info.debug("Garnish already in table")
         gar = in_table
     return gar
 
@@ -306,7 +315,7 @@ def close_session(session):
         session.commit()
     except IntegrityError as e:
         session.rollback()
-        logging.warning("Commit failed, rolling back changes")
+        drinks_warn.error("Commit failed, rolling back changes")
     finally:
         session.close()
 
@@ -316,7 +325,6 @@ def ing_regex(ing_name):
     :param ingredient: ingredient name from spreadsheet (eg. 2 DASHES ANGOSTURA BITTERS)
     :return: Returns three variables: quantity (float), measurement (String), ing (String)
     """
-    # logging.info("Starting ingredient name: {}".format(ing_name))
     # Initialize holder variables
     quantity, dash_hold, tsp_hold, special_flag, oz_hold = "", "", "", "", ""
 
@@ -362,11 +370,14 @@ def ing_regex(ing_name):
         # This is the special case with no measurement given
         measurement = ""
 
-    # logging.debug("Ending ingredient name: {}".format(ing_name))
-    logging.debug("Converted Ingredient: {} {} {}".format(quantity, measurement, ing_name))
     return quantity, measurement, ing_name
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.DEBUG)
+    setup_loggers = Loggers()
+    setup_loggers.setup_logging(default_level=logging.INFO)
 
+    #
+    populate = DB_Builder()
+    # populate.sql_from_itertuples()
+    populate.populate_simple_drink()
 

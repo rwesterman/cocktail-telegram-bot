@@ -1,6 +1,8 @@
 import logging
 from drinksSqlDb import query_drink_contains, get_formatted_ingredients, get_drink_session, close_session, ing_contains_all
 
+log = logging.getLogger("info." + __name__)
+
 def drink_search(drink_list):
     """Returns Drink objects corresponding to searched drink names"""
     # Start a new SQL session, pass it as return
@@ -23,7 +25,7 @@ def drink_search(drink_list):
         # list.extend concatenates the list so it's one dimensional
         result_list.extend(recipe)
 
-    logging.debug(result_list)
+    log.debug(result_list)
     return result_list, session
 
 def ing_search(ing_name):
@@ -38,7 +40,7 @@ def ing_search(ing_name):
         for drink in lst.drinks:
             # append each drink name to existing list
             use_list.append(drink.drink_name)
-    logging.debug("{} results for ingredient {}: {}".format(len(use_list), ing_name, use_list))
+    log.debug("{} results for ingredient {}: {}".format(len(use_list), ing_name, use_list))
     close_session(session)
     return use_list
 
@@ -49,11 +51,7 @@ def recipe_string(recipe, session):
     botString += '\n'.join(get_formatted_ingredients(recipe)).title()
     # If the drink has a garnish, add it to the bottom of the string
     if recipe.garnishes:
-        logging.debug("return from Drink.garnishes: {}".format(recipe.garnishes))
+        log.debug("return from Drink.garnishes: {}".format(recipe.garnishes))
         botString += "\nGarnish with {}".format(recipe.garnishes[0].gar.title())
-    logging.debug("botstring output: {}".format(botString))
+    log.debug("botstring output: {}".format(botString))
     return botString
-#
-#
-# if __name__ == '__main__':
-#     logging.basicConfig(level = logging.DEBUG)

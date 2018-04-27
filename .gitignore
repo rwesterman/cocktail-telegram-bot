@@ -10,3 +10,6 @@ user.db
 *.pyc
 *.xml
 .idea/cocktail-telegram-bot.iml
+
+# Ignore personal log files
+*.log

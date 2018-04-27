@@ -9,6 +9,8 @@ import drinksSqlDb
 import userSqlDb
 import searchDB
 
+from readJSON import Secrets, Loggers
+
 # set state paths to integer numbers starting at 0
 RECIPE, EXIT = range(2)  # Used for /drinks command conversation (recipe_helper)
 USER_PERMISSION, ALLOW_TRACKING, USER_SETUP = range(3)  # Used for user /start conversation
@@ -34,8 +36,8 @@ def start(bot, update):
         return USER_PERMISSION
     # If the user is already in the database, then end the conversation handler and don't send prompts
     else:
-        logging.info("User already added to database")
-        logging.info("User data: {}".format(chk_usr))
+        info_log.debug("User already added to database")
+        info_log.debug("User data: {}".format(chk_usr))
         return ConversationHandler.END
 
 
@@ -67,11 +69,12 @@ def setup_permission(bot, update):
 def store_user_data(bot, user, chat_id):
     session = userSqlDb.add_user(user_id=user.id, first_name=user.first_name, last_name=user.last_name, chat_id=chat_id)
     if userSqlDb.check_for_user_id(user.id):
+        info_log.info("Added user to database."
+                      "\nFirst Name: {}\nLast Name: {}\nUser ID: {}".format(user.first_name, user.last_name, user.id))
         bot.send_message(chat_id=chat_id, text="Your username and ID have been added to the database")
 
 
 def add_fav_command(bot, update):
-    # Todo: Check that user is being tracked (in user database), if not, offer to add them or exit
     bot.send_message(chat_id=update.message.chat_id,
                      text="You have chosen to add a drink to your favorites list. "
                           "Please respond with the drink you want to add or type 'exit' to quit")
@@ -108,7 +111,7 @@ def add_fav_drink(bot, update):
         # Extract drink name from list and output through bot message
         for drink in drink_contain:
             suggestions.append(drink.drink_name)
-        logging.debug(suggestions)
+        info_log.debug(suggestions)
         message = "Did you mean to send one of these drinks?:\n{}" \
                   "\nIf so, please send the drink name again, or type 'exit' to leave".format(
             "\n".join(suggestions).title())
@@ -119,7 +122,6 @@ def add_fav_drink(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="Sorry, I was unable to find a drink that matched")
         drnk_session.close()
         return ConversationHandler.END
-
 
 def rem_fav_command(bot, update):
     bot.send_message(chat_id=update.message.chat_id,
@@ -153,7 +155,7 @@ def validate_user(bot, update):
         return user, session
     except TypeError as e:
         # Will receive TypeError if the check_for_user_id fails to return a user, NoneType not iterable
-        logging.warning("User is not in the user database, needs to be added to use this functionality")
+        warn_log.warning("User is not in the user database, needs to be added to use this functionality")
         user_not_added(bot, update)
         return "", ""
 
@@ -202,9 +204,9 @@ def add_user_inv(bot, update):
             # similar_ing will hold the ingredient names to send the user as suggestions
             similar_ing = []
             for ingredient in drinksSqlDb.ing_contains_all(msg_txt, drnk_session):
-                similar_ing.append(ingredient.ing)
+                similar_ing.append(ingredient.ing.title())
             for simple in drinksSqlDb.simple_contains_all(msg_txt, drnk_session):
-                similar_ing.append(simple.ing)
+                similar_ing.append(simple.ing.title())
             # If similar ingredients were found, send a list of them to user
             if similar_ing:
                 bot_text = "No ingredient uses that name. Did you mean one of the following?\n" \
@@ -253,7 +255,7 @@ def rem_user_inv(bot, update):
             bot.send_message(chat_id=chat_id,
                             text="Removing {} from inventory.".format(msg_txt.title()))
         except ValueError as e:
-            logging.warning("{} is not in inventory, and can't be removed".format(msg_txt.title()))
+            warn_log.warning("{} is not in inventory, and can't be removed".format(msg_txt.title()))
             bot.send_message(chat_id = chat_id, text = "{} is not in your inventory".format(msg_txt.title()))
         finally:
             bot.send_message(chat_id = chat_id,
@@ -286,7 +288,7 @@ def list_user_inv(user):
     for item in user_stock:
         stock_list.append(item.stock.title())
     bot_text = "Here is your current inventory:\n{}".format("\n".join(stock_list))
-    logging.debug(bot_text)
+    info_log.debug(bot_text)
     return bot_text
 
 def favorite_recipes(bot, update):
@@ -318,7 +320,7 @@ def makeable(bot, update):
     makeable_drink_set = makeable_from_inv(user, usr_sess)
     bot_text = "With your current inventory you can make {} drinks:\n".format(len(makeable_drink_set))
     bot_text += "\n".join(makeable_drink_set)
-    logging.debug("Bot message as follows: \n{}".format(bot_text))
+    info_log.debug("Bot message as follows: \n{}".format(bot_text))
     bot.send_message(chat_id=update.message.chat_id, text=bot_text)
 
 
@@ -372,7 +374,7 @@ def compare_vs_inventory(drink_set, simple_inventory):
 
         if drink_ing_set.issubset(simple_inventory):
             final_drink_set.add(drink.drink_name)
-    logging.debug("Found {} makeable drinks: {}".format(len(final_drink_set), final_drink_set))
+    info_log.debug("Found {} makeable drinks: {}".format(len(final_drink_set), final_drink_set))
     return final_drink_set
 
 
@@ -437,7 +439,7 @@ def exit_list(bot, update):
 
 
 def kill(bot, update, args):
-    logging.info('Process stopped')
+    info_log.info('Process stopped')
     updater.stop()
 
 
@@ -478,8 +480,7 @@ def create_handlers(updater, dispatcher):
             RECIPE: [MessageHandler(filters=Filters.regex("[eE]xit"), callback=exit_list),
                      MessageHandler(filters=Filters.text, callback=recipe_return)],
         },
-        fallbacks=[CallbackQueryHandler(exit_list),
-                   MessageHandler(filters=Filters.regex("[eE]xit"), callback=exit_list)]
+        fallbacks=[MessageHandler(filters=Filters.regex("[eE]xit"), callback=exit_list)]
     )
     dispatcher.add_handler(recipe_handler)
 
@@ -517,16 +518,28 @@ def create_handlers(updater, dispatcher):
     dispatcher.add_handler(inv_handler)
 
 
-def main():
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+if __name__ == '__main__':
+    # Setup specific loggers from config.json
+    setup_loggers = Loggers()
+    setup_loggers.setup_logging(default_level=logging.INFO)
 
+    # Setup default logger. telegram python module uses this, mostly at DEBUG level
+    logging.basicConfig(level = logging.INFO, format= "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+    # Get loggers from config.json setup, add file name to output for traceability
+    info_log = logging.getLogger("info." + __name__)
+    warn_log = logging.getLogger("warn." + __name__)
+
+    # toggle this to show/hide debug level logs
+    # info_log.setLevel(logging.DEBUG)
+
+    auth = Secrets()
     # Bottender Token
-    token = '391638807:AAGqCR37_1y9uxMTZfAlnKromKhS0J0XsZc'
+    token = auth.bottender_token
 
     # Debugbot Token
-    # token = '563248703:AAGiRYnpZ_vFuG_ycowZ4qRH7vt63Wc3j58'
-    global updater
+    # token = auth.debug_token
+
     updater = Updater(token=token)  # pass bot api token
     dispatcher = updater.dispatcher
 
@@ -535,7 +548,3 @@ def main():
 
     updater.idle()
     print('Idle Signal Received')
-
-
-if __name__ == '__main__':
-    main()

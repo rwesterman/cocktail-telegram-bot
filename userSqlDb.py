@@ -5,6 +5,9 @@ from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
+user_log = logging.getLogger("info." + __name__)
+user_warn = logging.getLogger("warn." + __name__)
+
 engine = create_engine('sqlite:///user.db')
 Base = declarative_base()
 # Bind the new Session to our engine
@@ -87,11 +90,11 @@ def set_user_favorite(user, fav_drink, session):
     in_table = check_drink_in_table(fav_drink)
     # If the drink isn't in the table, add it (it will be an empty list if not in table)
     if not in_table:
-        logging.debug("Adding {} to favorites table".format(fav_drink))
+        user_log.debug("Adding {} to favorites table".format(fav_drink))
         drink = Favorite(favorites = fav_drink, popularity = 0) #popularity = 0 because not in anyones favorites yet
     #If the drink is in the table, simply add it to user
     else:
-        logging.debug("Drink is already in table")
+        user_log.debug("Drink is already in table")
         drink = in_table #set to same variable as in "if" statement
 
     try:
@@ -102,10 +105,10 @@ def set_user_favorite(user, fav_drink, session):
         # session = Session()
         session.commit()
     except InvalidRequestError as e:
-        logging.error("This drink is already associated with the user")
+        user_warn.warning("This drink is already associated with the user")
     except IntegrityError as e:
         session.rollback()
-        logging.error("Encountered IntegrityError in set_user_favorite(). Rolling session back")
+        user_warn.warning("Encountered IntegrityError in set_user_favorite(). Rolling session back")
 
 def rem_user_favorites(user, session, drink_name):
     rem_drink = session.query(Favorite).filter(Favorite.favorites.like(drink_name)).first()
@@ -113,13 +116,13 @@ def rem_user_favorites(user, session, drink_name):
     try:
         user.favorites.remove(rem_drink)
         session.commit()
-        logging.info("Removed {} from {}'s favorites".format(drink_name.title(), user.first_name))
+        user_log.info("Removed {} from {}'s favorites".format(drink_name.title(), user.first_name))
     except ValueError as e:
-        logging.warning("Trying to remove a value that doesn't exist")
+        user_warn.error("Failed to remove user favorite {}, value does not exist".format(drink_name))
         raise
     except IntegrityError as e:
         session.rollback()
-        logging.warning("Failed to commit changes in rem_inventory(), rolling back session")
+        user_warn.warning("Failed to commit changes in rem_inventory(), rolling back session")
 
 def get_user_favorites(user):
     """
@@ -163,17 +166,17 @@ def add_inventory(user, ing_name, session):
     usr_sess = session
     in_table = check_ing_in_inv(ing_name)
     if not in_table:
-        logging.debug("Adding {} to inventory table".format(ing_name))
+        user_log.debug("Adding {} to inventory table".format(ing_name))
         inv = Inventory(stock = ing_name) # Add the ingredient to the inventory table
         usr_sess.add(inv)
         try:
             usr_sess.commit()
         except IntegrityError as e:
-            logging.debug("Session commit failed in add_inventory, rolling back")
+            user_log.debug("Session commit failed in add_inventory, rolling back")
             usr_sess.rollback()
     #If the ingredient is in the table, simply add it to user
     else:
-        logging.debug("Ingredient is already in inventory table")
+        user_log.debug("Ingredient is already in inventory table")
         inv = in_table #set to same variable as in "if" statement
 
     try:
@@ -185,13 +188,13 @@ def add_inventory(user, ing_name, session):
 
         user.stock.append(local_inv)
         usr_sess.commit()
-        logging.info("Added {} to inventory of user {}".format(ing_name, user.first_name))
+        user_log.info("Added {} to inventory of user {}".format(ing_name, user.first_name))
     except InvalidRequestError as e:
-        logging.error("InvalidRequestError {}".format(e))
-        logging.error("The user already has {} in their inventory".format(ing_name))
+        user_warn.error("InvalidRequestError {}".format(e))
+        user_warn.error("The user already has {} in their inventory".format(ing_name))
     except IntegrityError as e:
         usr_sess.rollback()
-        logging.error("Encountered IntegrityError in add_inventory(). Rolling session back")
+        user_warn.warning("Encountered IntegrityError in add_inventory(). Rolling session back")
 
 
 def rem_inventory(user, session, ing):
@@ -206,13 +209,13 @@ def rem_inventory(user, session, ing):
     try:
         user.stock.remove(inv_item)
         session.commit()
-        logging.info("Removed {} from inventory of user {}".format(ing, user.first_name))
+        user_log.info("Removed {} from inventory of user {}".format(ing, user.first_name))
     except ValueError as e:
-        logging.warning("Trying to remove a value that doesn't exist")
+        user_warn.warning("Trying to remove a value that doesn't exist")
         raise
     except IntegrityError as e:
         session.rollback()
-        logging.warning("Failed to commit changes in rem_inventory(), rolling back session")
+        user_warn.warning("Failed to commit changes in rem_inventory(), rolling back session")
 
 def get_user_inv(user):
     """
@@ -221,8 +224,3 @@ def get_user_inv(user):
     :return: List of Inventory objects
     """
     return user.stock
-
-
-
-if __name__ == '__main__':
-    logging.basicConfig(level = logging.DEBUG)
