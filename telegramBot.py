@@ -1,5 +1,8 @@
 #! python3
 
+# Todo: Add "Admin" accounts and functionality. Create /admin command and require password, then mark user as admin
+# Allow admin accounts to do things like add drinks to table. Can make a prompt to add drinks and ingredients from phone?
+
 import logging
 
 from telegram import ReplyKeyboardRemove
@@ -524,12 +527,15 @@ if __name__ == '__main__':
     setup_loggers.setup_logging(default_level=logging.INFO)
 
     # Setup default logger. telegram python module uses this, mostly at DEBUG level
-    logging.basicConfig(level = logging.INFO, format= "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    # This sets a root logger, which will cause duplicate outputs on all other logs while active.
+    # Only use this to monitor telegram-python-bot debug messages
+    # logging.basicConfig(level = logging.DEBUG, format= "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # Get loggers from config.json setup, add file name to output for traceability
     info_log = logging.getLogger("info." + __name__)
     warn_log = logging.getLogger("warn." + __name__)
 
+    info_log.info("Launching telegramBot.py now")
     # toggle this to show/hide debug level logs
     # info_log.setLevel(logging.DEBUG)
 
