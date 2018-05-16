@@ -158,7 +158,7 @@ class DB_Builder():
     """This class is used to quickly rebuild my databases in case I lose them"""
 
     def __init__(self):
-        with open(os.path.join(os.getcwd(),"json", "simplify.json"),'r') as f:
+        with open(os.path.join(os.path.abspath(os.path.dirname(__file__)),"json", "simplify.json"),'r') as f:
             self.simplify_dict = json.load(f)
 
     def sql_from_itertuples(self):

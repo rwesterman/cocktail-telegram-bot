@@ -13,3 +13,4 @@ user.db
 
 # Ignore personal log files
 *.log
+*.xml___jb_tmp___
