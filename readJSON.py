@@ -49,7 +49,7 @@ class Loggers:
         if not os.path.exists(log_path):
             os.mkdir(log_path)
 
-        # default_path is abs path to json/config.json 
+        # default_path is abs path to json/config.json
         path = default_path
         if os.path.exists(path):
             with open(path, 'rt') as f:
@@ -61,8 +61,8 @@ class Loggers:
                 error_filename = config["handlers"]["error_file_handler"]["filename"]
 
                 # move files into "logs" folder, make platform unspecific with os.path.join
-                config["handlers"]["info_file_handler"]["filename"] = os.path.join("logs", info_filename)
-                config["handlers"]["error_file_handler"]["filename"] = os.path.join("logs", error_filename)
+                config["handlers"]["info_file_handler"]["filename"] = os.path.join(log_path, info_filename)
+                config["handlers"]["error_file_handler"]["filename"] = os.path.join(log_path, error_filename)
 
                 logging.config.dictConfig(config)
         else:
