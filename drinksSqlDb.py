@@ -10,7 +10,8 @@ from readJSON import Secrets, Loggers
 drinks_info = logging.getLogger("info." + __name__)
 drinks_warn = logging.getLogger("warn." + __name__)
 
-engine = create_engine('sqlite:///drinks.db')
+dbpath = os.path.join(os.path.abspath(os.path.dirname(__file__)), "drinks.db")
+engine = create_engine('sqlite:////{}'.format(dbpath))
 Base = declarative_base()
 
 ing_assc_table = Table('ing_assc', Base.metadata,

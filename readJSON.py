@@ -49,10 +49,8 @@ class Loggers:
         if not os.path.exists(log_path):
             os.mkdir(log_path)
 
+        # default_path is abs path to json/config.json 
         path = default_path
-        value = os.getenv(env_key, None)
-        if value:
-            path = value
         if os.path.exists(path):
             with open(path, 'rt') as f:
                 # config holds the dictionary object.
