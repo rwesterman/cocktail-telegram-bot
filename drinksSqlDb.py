@@ -21,9 +21,6 @@ ing_assc_table = Table('ing_assc', Base.metadata,
 gar_assc_table = Table('gar_assc', Base.metadata,
                        Column('Drink_name', String, ForeignKey('drinks.drink_name')),
                        Column('Garnish_string', String, ForeignKey('garnishes.gar')))
-def logtest():
-    drinks_info.info("Testing the info logger")
-    drinks_warn.error("Testing the error logger")
 
 class Drink(Base):
     __tablename__ = 'drinks'
@@ -158,7 +155,7 @@ class DB_Builder():
     """This class is used to quickly rebuild my databases in case I lose them"""
 
     def __init__(self):
-        with open(os.path.join(os.getcwd(),"json", "simplify.json"),'r') as f:
+        with open(os.path.join(os.path.abspath(os.path.dirname(__file__)),"json", "simplify.json"),'r') as f:
             self.simplify_dict = json.load(f)
 
     def sql_from_itertuples(self):

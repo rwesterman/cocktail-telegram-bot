@@ -20,7 +20,8 @@ class Secrets:
             self.json_log.error("secrets.json does not exist on this system, certain methods cannot be used.")
 
     def open_json(self):
-        path = os.path.join(os.getcwd(), "json", "secret.json")
+        telegram_path = os.path.abspath(os.path.dirname(__file__))
+        path = os.path.join(telegram_path, "json", "secret.json")
         with open(path, 'r') as f:
             data = json.load(f)
             self.client_secret = data["sheets"]["client_secret"]
@@ -34,7 +35,7 @@ class Secrets:
 class Loggers:
 
     def setup_logging(self,
-            default_path=os.path.join(os.getcwd(), "json", "config.json"),
+            default_path=os.path.join(os.path.abspath(os.path.dirname(__file__)), "json", "config.json"),
             default_level=logging.INFO,
             env_key='LOG_CFG'):
         """
@@ -45,7 +46,7 @@ class Loggers:
         :return:
         """
         # if no log folder exists, create the path
-        log_path = os.path.join(os.getcwd(), "logs")
+        log_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "logs")
         if not os.path.exists(log_path):
             os.mkdir(log_path)
 

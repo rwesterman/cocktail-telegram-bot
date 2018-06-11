@@ -4,6 +4,9 @@
 # Allow admin accounts to do things like add drinks to table. Can make a prompt to add drinks and ingredients from phone?
 
 import logging
+import subprocess
+import os
+import time
 
 from telegram import ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, Filters
@@ -13,6 +16,7 @@ import userSqlDb
 import searchDB
 
 from readJSON import Secrets, Loggers
+
 
 # set state paths to integer numbers starting at 0
 RECIPE, EXIT = range(2)  # Used for /drinks command conversation (recipe_helper)
@@ -435,6 +439,35 @@ def help(bot, update):
                           "to be tracked. If you want to allow this, send the command '/start' and "
                           "allow tracking.")
 
+def update_db(bot, update):
+    # Send message about trying to update database
+    bot.send_message(chat_id = update.message.chat_id, text = "Attempting to update database")
+    # Get current time to compare to database's modified time
+    start_time = time.time()
+
+    db_path = os.path.join(os.path.dirname(__file__), "drinks.db")
+
+    # Run the bash script to update the database
+    script_path = os.path.join(os.path.dirname(__file__), "update_db.sh")
+    subprocess.call(script_path, shell=True)
+
+    # Wait two seconds to allow the download
+    time.sleep(2)
+
+    # get the modification time of drinks.db
+    try:
+        db_mod = os.path.getmtime(db_path)
+
+        # Check if the file was modified
+        if db_mod > start_time:
+            bot.send_message(chat_id = update.message.chat_id, text = "Succesffuly updated database")
+        else:
+            bot.send_message(chat_id = update.message.chat_id, text = "Could not update database")
+    except OSError as e:
+        bot.send_message(chat_id = update.message.chat_id, text = "Drinks.db was not found. Check the filepath in the code")
+        warn_log.error(f"Found OSError in update_db: {e}")
+
+
 
 def exit_list(bot, update):
     update.message.reply_text('Bye!', reply_markup=ReplyKeyboardRemove())
@@ -450,6 +483,9 @@ def create_handlers(updater, dispatcher):
     help_handler = CommandHandler('help', help)
     dispatcher.add_handler(help_handler)
     updater.start_polling()
+
+    update_handler = CommandHandler('update', update_db)
+    dispatcher.add_handler(update_handler)
 
     ing_handler = CommandHandler('ing', ing, pass_args=True)
     dispatcher.add_handler(ing_handler)
