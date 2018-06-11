@@ -465,7 +465,7 @@ def update_db(bot, update):
             bot.send_message(chat_id = update.message.chat_id, text = "Could not update database")
     except OSError as e:
         bot.send_message(chat_id = update.message.chat_id, text = "Drinks.db was not found. Check the filepath in the code")
-        warn_log.error(f"Found OSError in update_db: {e}")
+        warn_log.error("Found OSError in update_db: {}".format(e))
 
 def exit_list(bot, update):
     update.message.reply_text('Bye!', reply_markup=ReplyKeyboardRemove())
