@@ -8,8 +8,10 @@ from sqlalchemy.orm import sessionmaker, relationship
 user_log = logging.getLogger("info." + __name__)
 user_warn = logging.getLogger("warn." + __name__)
 
-dbpath = os.path.join(os.path.abspath(os.path.dirname(__file__)), "user.db")
-engine = create_engine('sqlite:////{}'.format(dbpath))
+# dbpath = os.path.join(os.path.abspath(os.path.dirname(__file__)), "user.db")
+# engine = create_engine('sqlite:////{}'.format(dbpath))
+engine = create_engine('sqlite:///user.db')
+
 Base = declarative_base()
 # Bind the new Session to our engine
 Session = sessionmaker(bind=engine)
